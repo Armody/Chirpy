@@ -23,9 +23,6 @@ func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, req *http.Reque
 		Body   string    `json:"body"`
 		UserID uuid.UUID `json:"user_id"`
 	}
-	type returnVals struct {
-		Chirps
-	}
 
 	decoder := json.NewDecoder(req.Body)
 	params := parameters{}
@@ -56,14 +53,12 @@ func (cfg *apiConfig) handlerChirpsCreate(w http.ResponseWriter, req *http.Reque
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create chirp", err)
 	}
 
-	respondWithJSON(w, http.StatusCreated, returnVals{
-		Chirps: Chirps{
-			ID:        chirp.ID,
-			CreatedAt: chirp.CreatedAt,
-			UpdatedAt: chirp.UpdatedAt,
-			Body:      chirp.Body,
-			UserID:    chirp.UserID,
-		},
+	respondWithJSON(w, http.StatusCreated, Chirps{
+		ID:        chirp.ID,
+		CreatedAt: chirp.CreatedAt,
+		UpdatedAt: chirp.UpdatedAt,
+		Body:      chirp.Body,
+		UserID:    chirp.UserID,
 	})
 }
 
@@ -75,4 +70,25 @@ func getCleanedBody(body string, badWords map[string]struct{}) string {
 		}
 	}
 	return strings.Join(words, " ")
+}
+
+func (cfg *apiConfig) handlerChirpsGet(w http.ResponseWriter, req *http.Request) {
+	dbChirps, err := cfg.db.GetChirps(req.Context())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't get chirps", err)
+		return
+	}
+
+	chirps := []Chirps{}
+	for _, chirp := range dbChirps {
+		chirps = append(chirps, Chirps{
+			ID:        chirp.ID,
+			CreatedAt: chirp.CreatedAt,
+			UpdatedAt: chirp.UpdatedAt,
+			Body:      chirp.Body,
+			UserID:    chirp.UserID,
+		})
+	}
+
+	respondWithJSON(w, http.StatusOK, chirps)
 }
