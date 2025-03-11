@@ -6,13 +6,18 @@ import (
 	"time"
 
 	"github.com/Armody/Chirpy/internal/auth"
+	"github.com/Armody/Chirpy/internal/database"
 )
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 	type parameters struct {
-		Email     string         `json:"email"`
-		Password  string         `json:"password"`
-		ExpiresIn *time.Duration `json:"expiers_in_seconds"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	type returnVals struct {
+		User
+		Token        string `json:"token"`
+		RefreshToken string `json:"refresh_token"`
 	}
 
 	decoder := json.NewDecoder(req.Body)
@@ -21,14 +26,6 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
 		return
-	}
-
-	expireTime := time.Duration(time.Hour)
-	if params.ExpiresIn != nil {
-		expireTime = *params.ExpiresIn
-	}
-	if expireTime > time.Duration(time.Hour) {
-		expireTime = time.Duration(time.Hour)
 	}
 
 	user, err := cfg.db.GetUserByEmail(req.Context(), params.Email)
@@ -42,17 +39,33 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	token, err := auth.MakeJWT(user.ID, cfg.jwtSecret, expireTime)
+	token, err := auth.MakeJWT(user.ID, cfg.jwtSecret, time.Hour)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create token", err)
 		return
 	}
 
-	respondWithJSON(w, http.StatusOK, User{
-		ID:        user.ID,
-		CreatedAt: user.CreatedAt,
-		UpdatedAt: user.UpdatedAt,
-		Email:     user.Email,
-		Token:     token,
+	refString, err := auth.MakeRefreshToken()
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't make refresh token", err)
+		return
+	}
+	if _, err := cfg.db.MakeRefreshToken(req.Context(), database.MakeRefreshTokenParams{
+		Token:     refString,
+		UserID:    user.ID,
+		ExpiresAt: time.Now().UTC().Add(time.Hour * 24 * 60),
+	}); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't create refresh token in database", err)
+	}
+
+	respondWithJSON(w, http.StatusOK, returnVals{
+		User: User{
+			ID:        user.ID,
+			CreatedAt: user.CreatedAt,
+			UpdatedAt: user.UpdatedAt,
+			Email:     user.Email,
+		},
+		Token:        token,
+		RefreshToken: refString,
 	})
 }
