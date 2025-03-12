@@ -84,10 +84,28 @@ func getCleanedBody(body string, badWords map[string]struct{}) string {
 }
 
 func (cfg *apiConfig) handlerChirpsGet(w http.ResponseWriter, req *http.Request) {
-	dbChirps, err := cfg.db.GetChirps(req.Context())
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't get chirps", err)
-		return
+	authorID := req.URL.Query().Get("author_id")
+	dbChirps := []database.Chirp{}
+
+	if authorID == "" {
+		db, err := cfg.db.GetChirps(req.Context())
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Couldn't get chirps", err)
+			return
+		}
+		dbChirps = append(dbChirps, db...)
+	} else {
+		userID, err := uuid.Parse(authorID)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Couldn't parse author id", err)
+			return
+		}
+		db, err := cfg.db.GetChirpsByAuthourId(req.Context(), userID)
+		if err != nil {
+			respondWithError(w, http.StatusNotFound, "invalid user id", err)
+			return
+		}
+		dbChirps = append(dbChirps, db...)
 	}
 
 	chirps := []Chirps{}
