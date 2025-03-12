@@ -28,18 +28,18 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	user, err := cfg.db.GetUserByEmail(req.Context(), params.Email)
+	dbUser, err := cfg.db.GetUserByEmail(req.Context(), params.Email)
 	if err != nil {
 		respondWithError(w, http.StatusUnauthorized, "Incorrect email or password", err)
 		return
 	}
 
-	if err := auth.CheckPasswordHash(params.Password, user.HashedPassword); err != nil {
+	if err := auth.CheckPasswordHash(params.Password, dbUser.HashedPassword); err != nil {
 		respondWithError(w, http.StatusUnauthorized, "Incorrect email or password", err)
 		return
 	}
 
-	token, err := auth.MakeJWT(user.ID, cfg.jwtSecret, time.Hour)
+	token, err := auth.MakeJWT(dbUser.ID, cfg.jwtSecret, time.Hour)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create token", err)
 		return
@@ -52,7 +52,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 	}
 	if _, err := cfg.db.MakeRefreshToken(req.Context(), database.MakeRefreshTokenParams{
 		Token:     refString,
-		UserID:    user.ID,
+		UserID:    dbUser.ID,
 		ExpiresAt: time.Now().UTC().Add(time.Hour * 24 * 60),
 	}); err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't create refresh token in database", err)
@@ -60,10 +60,11 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, req *http.Request) {
 
 	respondWithJSON(w, http.StatusOK, returnVals{
 		User: User{
-			ID:        user.ID,
-			CreatedAt: user.CreatedAt,
-			UpdatedAt: user.UpdatedAt,
-			Email:     user.Email,
+			ID:          dbUser.ID,
+			CreatedAt:   dbUser.CreatedAt,
+			UpdatedAt:   dbUser.UpdatedAt,
+			Email:       dbUser.Email,
+			IsChirpyRed: dbUser.IsChirpyRed,
 		},
 		Token:        token,
 		RefreshToken: refString,
