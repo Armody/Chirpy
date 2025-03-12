@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
@@ -106,6 +107,13 @@ func (cfg *apiConfig) handlerChirpsGet(w http.ResponseWriter, req *http.Request)
 			return
 		}
 		dbChirps = append(dbChirps, db...)
+	}
+
+	sortType := req.URL.Query().Get("sort")
+	if sortType == "desc" {
+		slices.SortFunc(dbChirps, func(i, j database.Chirp) int {
+			return j.CreatedAt.Compare(i.CreatedAt)
+		})
 	}
 
 	chirps := []Chirps{}
