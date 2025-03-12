@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/Armody/Chirpy/internal/auth"
 	"github.com/google/uuid"
 )
 
@@ -22,6 +23,17 @@ func (cfg *apiConfig) handlerWebhookUpgrade(w http.ResponseWriter, req *http.Req
 	err := decoder.Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
+		return
+	}
+
+	apiKey, err := auth.GetApiKey(req.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't extract API key", err)
+		return
+	}
+
+	if apiKey != cfg.polkaApi {
+		respondWithError(w, http.StatusUnauthorized, "API key is invalid", err)
 		return
 	}
 

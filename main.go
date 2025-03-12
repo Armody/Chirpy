@@ -15,6 +15,7 @@ import (
 type apiConfig struct {
 	platform       string
 	jwtSecret      string
+	polkaApi       string
 	db             *database.Queries
 	fileserverHits atomic.Int32
 }
@@ -36,6 +37,10 @@ func main() {
 	if jwtSecret == "" {
 		log.Fatal("SECRET must be set")
 	}
+	polkaApi := os.Getenv("POLKA_KEY")
+	if polkaApi == "" {
+		log.Fatal("POLKA KEY must be set")
+	}
 
 	db, err := sql.Open("postgres", dbUrl)
 	if err != nil {
@@ -49,6 +54,7 @@ func main() {
 	apiCfg := apiConfig{
 		platform:       platform,
 		jwtSecret:      jwtSecret,
+		polkaApi:       polkaApi,
 		db:             dbQueries,
 		fileserverHits: atomic.Int32{},
 	}
